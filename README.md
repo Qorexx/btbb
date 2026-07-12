@@ -1,4 +1,4 @@
-#  Beyond the Black Box — AI-Powered Power Outage Predictor
+#  DrishtiX — AI-Powered Power Outage Predictor
 
 > An evidence-based, explainable ML system for predicting weather-induced power outages in India's UP/NCR region, trained on real US outage data via cross-continental transfer learning.
 
