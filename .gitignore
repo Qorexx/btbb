@@ -1,0 +1,54 @@
+# ── Python ──
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# ── Node / JS ──
+node_modules/
+.expo/
+.expo-shared/
+*.tsbuildinfo
+
+# ── Convex ──
+convex/_generated/
+
+# ── Large data files (too big for GitHub) ──
+data/*.csv
+data/*.xlsx
+data/*.pdf
+
+# ── Secrets & environment variables ──
+.env
+.env.local
+.env.*
+
+# ── Local databases ──
+*.db
+*.sqlite
+
+# ── OS files ──
+.DS_Store
+Thumbs.db
+
+# ── IDE ──
+.vscode/
+.idea/
+
+# ── Vercel ──
+.vercel
+
+# ── Android build artifacts ──
+android/app/build/
+android/.gradle/
+*.keystore
+!debug.keystore
+
+# ── Logs ──
+*.log
+npm-debug.log*
+
+# ── Misc ──
+ngrok
+ngrok.exe

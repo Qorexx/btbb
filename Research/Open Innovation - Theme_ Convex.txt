@@ -1,0 +1,54 @@
+﻿🚀 Theme: Convex
+If your team is building under the Convex theme, please go through the following resources before you begin development. These resources are designed to help you understand the platform, speed up development, and solve issues quickly during the hackathon.
+Step 1: Get Started with Convex
+Open the link below and click "Start Building." Follow the complete tutorial to learn:
+* How to set up a Convex project
+* Connecting your frontend with the backend
+* Creating and managing your database
+* Writing queries, mutations, and actions
+* Deploying your application
+* Understanding the overall Convex development workflow
+Completing this tutorial will give you a solid foundation and help you avoid common setup mistakes.
+🔗 Getting Started: https://convex.link/cchack
+________________
+
+
+📚 Essential Resources
+🏆 Hackathon Resources
+https://convex.dev/hackathon
+A dedicated resource hub for hackathon participants containing starter templates, guides, best practices, example projects, and tips to help you build production-ready applications quickly.
+________________
+
+
+📖 Official Documentation
+https://docs.convex.dev
+The complete documentation for Convex. Use it to learn about every feature, including authentication, database design, queries, mutations, actions, file storage, scheduling, deployment, integrations, and much more.
+________________
+
+
+🧩 Convex Components
+https://convex.dev/components
+Explore ready-to-use, open-source components built by the Convex team and community. These components let you add common functionality—such as authentication, rate limiting, workflows, search, and more—without building everything from scratch.
+________________
+
+
+🤖 AI Code Generation & AI Documentation
+https://docs.convex.dev/ai
+Build faster using AI-powered documentation and code generation. Ask questions in natural language, generate Convex code, understand APIs, and get implementation guidance directly from the documentation.
+________________
+
+
+🔍 Search Documentation & Discord
+https://search.convex.dev
+Search across the official documentation and the Convex Discord community in one place. If you're stuck, facing an error, or looking for implementation examples, this is the fastest way to find solutions and answers from both the docs and community discussions.
+________________
+
+
+💡 Recommended Before You Start
+Spend 20–30 minutes exploring these resources before writing your first line of code. A little preparation will help you:
+* ✅ Set up your project correctly
+* ✅ Build features much faster
+* ✅ Reuse existing components instead of reinventing them
+* ✅ Resolve errors quickly
+* ✅ Make the best use of Convex throughout the hackathon
+Happy Building! 🚀

@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+xgboost
+pandas
+numpy
+requests
+sqlalchemy
+apscheduler
+scikit-learn
+passlib[bcrypt]
+PyJWT
+python-multipart
+email-validator
