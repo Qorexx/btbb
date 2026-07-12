@@ -1,4 +1,4 @@
-# ⚡ Beyond the Black Box — AI-Powered Power Outage Predictor
+#  Beyond the Black Box — AI-Powered Power Outage Predictor
 
 > An evidence-based, explainable ML system for predicting weather-induced power outages in India's UP/NCR region, trained on real US outage data via cross-continental transfer learning.
 
@@ -8,7 +8,7 @@
 
 ---
 
-## 📌 Problem Statement
+##  Problem Statement
 
 Traditional outage prediction relies on simplistic weather thresholds (e.g., *"if wind > 60 km/h → predict outage"*). This fails to capture complex, non-linear relationships — such as how prolonged high humidity combined with moderate heat degrades transformer lifespans over time.
 
@@ -18,7 +18,7 @@ Traditional outage prediction relies on simplistic weather thresholds (e.g., *"i
 
 ---
 
-## 🧠 Approach — Cross-Continental Transfer Learning
+##  Approach — Cross-Continental Transfer Learning
 
 Since no publicly available Indian outage dataset exists, we leverage a key insight: **the physics of grid failure is universal** — transformers overheat under thermal stress and transmission lines snap under wind loads regardless of geography.
 
@@ -40,7 +40,7 @@ Indian Weather Data               →  Trained Model     →  Indian Risk Scores
 
 ---
 
-## 🏗️ Pipeline Architecture
+##  Pipeline Architecture
 
 ### Stage 1 — Data Preparation
 | Script | Purpose |
@@ -66,7 +66,7 @@ Indian Weather Data               →  Trained Model     →  Indian Risk Scores
 
 ---
 
-## 📊 Model Performance
+##  Model Performance
 
 ### v2 Model (26 features, threshold = 0.55)
 
@@ -96,7 +96,7 @@ Indian Weather Data               →  Trained Model     →  Indian Risk Scores
 
 ---
 
-## 🏙️ Infrastructure Fragility Scores
+##  Infrastructure Fragility Scores
 
 Inspired by [Wang et al. (2024)](https://doi.org/10.xxxx) — same weather causes different outage rates depending on local infrastructure quality. Scores are derived from **official DISCOM distribution loss data** (UPERC/PFC FY 2023-24).
 
@@ -111,7 +111,7 @@ Inspired by [Wang et al. (2024)](https://doi.org/10.xxxx) — same weather cause
 
 ---
 
-## 📖 Research Foundation
+##  Research Foundation
 
 This project is informed by systematic review of 4 academic papers:
 
@@ -122,7 +122,7 @@ This project is informed by systematic review of 4 academic papers:
 
 ---
 
-## ⚙️ Setup & Installation
+##  Setup & Installation
 
 ### Prerequisites
 - Python 3.10+
@@ -199,7 +199,7 @@ Project_Beyond-the-blackbox/
 
 ---
 
-## ⚠️ Known Limitations
+## Known Limitations
 
 1. **Cross-Continental Transfer Gap** — Model learned US grid failure patterns (heat-dominated). Indian grids fail differently (rain, overloaded transformers, poor maintenance).
 2. **Weather-Only Features** — No access to utility-specific data (equipment age, maintenance logs, load curves).
@@ -208,7 +208,7 @@ Project_Beyond-the-blackbox/
 
 ---
 
-## 🚧 Roadmap
+## Roadmap
 
 | Task | Status |
 |---|---|
@@ -227,9 +227,9 @@ Project_Beyond-the-blackbox/
 
 ---
 
-## 👥 Team
+## Team
 
- Team Simplicity Paradox
+ Team NERV
 
 ---
 
