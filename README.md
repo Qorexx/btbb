@@ -1,210 +1,359 @@
-#  DrishtiX — AI-Powered Power Outage Predictor
+# DrishtiX
 
-> An evidence-based, explainable ML system for predicting weather-induced power outages in India's UP/NCR region, trained on real US outage data via cross-continental transfer learning.
-
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
-[![XGBoost](https://img.shields.io/badge/XGBoost-2.1.4-orange.svg)](https://xgboost.readthedocs.io/)
-[![License](https://img.shields.io/badge/License-Academic-green.svg)](#)
+AI-powered power outage prediction for the Uttar Pradesh and National Capital Region (UP/NCR) in India. DrishtiX combines an XGBoost classifier trained on real US outage data with a live application stack that fetches weather, scores grid failure risk, and surfaces explainable predictions through a web dashboard.
 
 ---
 
-##  Problem Statement
+## Introduction
 
-Traditional outage prediction relies on simplistic weather thresholds (e.g., *"if wind > 60 km/h → predict outage"*). This fails to capture complex, non-linear relationships — such as how prolonged high humidity combined with moderate heat degrades transformer lifespans over time.
+Power distribution in UP/NCR is sensitive to weather, but simple threshold rules (for example, wind speed above a fixed cutoff) do not capture non-linear interactions such as sustained heat combined with high humidity degrading transformer performance over time.
 
-**Our Solution:** An XGBoost-based ML model that empirically learns multi-variable interactions between weather conditions and physical grid failures, enhanced with infrastructure fragility scoring unique to each city.
+DrishtiX addresses this by:
 
-**Target Cities:** Lucknow, Noida, Ghaziabad, Agra, Meerut, Firozabad
+1. Training an XGBoost classifier on labeled US outage data from the EAGLE-I dataset, using cross-continental transfer learning under the assumption that grid failure physics (thermal overload, wind stress) generalize across regions.
+2. Applying region-specific adjustments for Indian conditions, including DISCOM-based infrastructure fragility multipliers and a rain hazard calibration layer.
+3. Serving predictions through a FastAPI microservice, a Convex backend with hourly cron jobs, and a React dashboard for monitoring and citizen reporting.
+
+**Target cities:** Lucknow, Noida, Ghaziabad, Agra, Meerut, Firozabad.
+
+The system is designed to operate on public data sources (Open-Meteo weather, UPERC/PFC DISCOM reports, EAGLE-I outage records) without requiring proprietary utility sensor access.
 
 ---
 
-##  Approach — Cross-Continental Transfer Learning
+## Core Features
 
-Since no publicly available Indian outage dataset exists, we leverage a key insight: **the physics of grid failure is universal** — transformers overheat under thermal stress and transmission lines snap under wind loads regardless of geography.
+| Feature | Description |
+|---|---|
+| Weather-driven outage prediction | XGBoost v2 model with 26 engineered features; outputs hourly failure probability per city |
+| Risk classification | Four levels: LOW, MODERATE, HIGH, CRITICAL |
+| Explainable output | Plain-English summaries and ranked contributing factors per prediction |
+| Infrastructure fragility scoring | Per-city multipliers derived from official DISCOM distribution loss data |
+| Rain hazard calibration | Tiered multipliers to correct US-trained model bias against Indian rain/wind failure patterns |
+| Offline ML pipeline | Scripts for data filtering, feature engineering, training, MRMR analysis, and batch inference |
+| Live prediction service | FastAPI endpoint (`POST /predict`) for real-time scoring |
+| Automated data pipeline | Convex hourly cron fetches weather, calls the ML service, and stores results |
+| Citizen reporting | Users can submit and track outage-related reports (outage, voltage fluctuation, sparking, infrastructure damage) |
+| Real-time dashboard | React frontend with per-city risk display, history charts, and report management |
+
+---
+
+## Architecture
+
+### System overview
 
 ```
-US Weather + Real US Outage Data  →  XGBoost Training  →  Trained Model
-Indian Weather Data               →  Trained Model     →  Indian Risk Scores
-                                                        ↓
-                                              DISCOM Fragility Multiplier
-                                                        ↓
-                                              Adjusted Risk Predictions
+┌─────────────────────────────────────────────────────────────────┐
+│                        React Dashboard (web/)                   │
+│   City selection · Risk display · Reports · History charts      │
+└────────────────────────────┬────────────────────────────────────┘
+                             │ Convex queries / mutations
+┌────────────────────────────▼────────────────────────────────────┐
+│                    Convex Backend (web/convex/)                 │
+│   predictions · citizen_reports · weather_cache · auth          │
+│   Hourly cron → Open-Meteo → ML Service → save results          │
+└────────────────────────────┬────────────────────────────────────┘
+                             │ POST /predict
+┌────────────────────────────▼────────────────────────────────────┐
+│                   FastAPI ML Service (ml-service/)              │
+│   Feature engineering · XGBoost inference · Rain adjustment     │
+│   Fragility multiplier · Explainability generation              │
+└────────────────────────────┬────────────────────────────────────┘
+                             │ loads at startup
+┌────────────────────────────▼────────────────────────────────────┐
+│                   Trained Model (models/)                       │
+│   xgboost_model_v2.json · fragility_scores.json · model_config  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Data Sources
-| Source | Description | Size |
+### Cross-continental transfer learning
+
+No publicly available Indian outage dataset exists at the granularity required for supervised training. DrishtiX trains on real US outage events and applies the learned model to Indian weather:
+
+```
+US weather + EAGLE-I outage labels  →  XGBoost training  →  Trained model
+Indian weather (Open-Meteo)       →  Trained model     →  Raw risk scores
+                                                      ↓
+                                        Rain hazard adjustment
+                                                      ↓
+                                        DISCOM fragility multiplier
+                                                      ↓
+                                        Adjusted risk + explanation
+```
+
+### Data sources
+
+| Source | Role |
+|---|---|
+| [EAGLE-I Dataset](https://eagle-i.doe.gov/) (US DOE/ORNL) | County-level US outage events at 15-minute intervals (2023); filtered to six climate-matched US states |
+| [Open-Meteo API](https://open-meteo.com/) | Hourly historical and forecast weather (ERA5 reanalysis) for US training cities and UP/NCR targets |
+| UPERC/PFC Reports (FY 2023-24) | Official DISCOM distribution loss data for infrastructure fragility scoring |
+
+### ML pipeline (offline)
+
+The `src/` directory contains the batch training and inference pipeline:
+
+| Stage | Scripts | Output |
 |---|---|---|
-| [EAGLE-I Dataset](https://eagle-i.doe.gov/) (US DOE/ORNL) | Real county-level outage events at 15-min intervals (2023) | 26M rows, 1.2 GB |
-| [Open-Meteo Archive API](https://open-meteo.com/) | Hourly historical weather (ERA5 reanalysis) for any global coordinate | ~1.7M matched rows |
-| UPERC/PFC Reports (FY 2023-24) | Official DISCOM performance data for UP utilities | 3 DISCOMs |
+| Data preparation | `filter_eagle_i.py`, `fetch_us_weather.py`, `engineer_us_features.py` | Filtered US outage data merged with weather features |
+| Model training | `train_model.py`, `enhance_and_retrain.py`, `mrmr_selection.py` | `xgboost_model.json` (v1, 13 features), `xgboost_model_v2.json` (v2, 26 features) |
+| Indian inference | `fetch_weather.py`, `feature_engineering.py`, `inference.py`, `inference_v2.py` | Hourly risk scores for six UP/NCR cities |
 
----
+### Model configuration
 
-##  Pipeline Architecture
+**Algorithm:** XGBoost classifier with cost-sensitive learning (`scale_pos_weight = 6.37`) to address 13.6% positive-class imbalance.
 
-### Stage 1 — Data Preparation
-| Script | Purpose |
-|---|---|
-| `src/filter_eagle_i.py` | Filters EAGLE-I to 6 US states with climates matching UP/NCR (TX, AZ, LA, FL, MS, OK) |
-| `src/fetch_us_weather.py` | Fetches hourly weather for 20 US cities, merges with outage data via haversine matching |
-| `src/engineer_us_features.py` | Engineers 13 features (v1): heat index, temporal flags, seasonal indicators |
-
-### Stage 2 — Model Training & Enhancement
-| Script | Purpose |
-|---|---|
-| `src/train_model.py` | Trains XGBoost v1 (13 features) with cost-sensitive learning (`scale_pos_weight=6.37`) |
-| `src/enhance_and_retrain.py` | Adds 13 new features (wind gusts, rolling temps, interaction terms) → v2 (26 features) |
-| `src/mrmr_selection.py` | MRMR feature selection — validates all features contribute meaningfully |
-
-### Stage 3 — Inference
-| Script | Purpose |
-|---|---|
-| `src/fetch_weather.py` | Fetches 2 years of hourly weather for 6 UP/NCR cities |
-| `src/feature_engineering.py` | Engineers features with Indian seasonal definitions (summer = Apr–Jun) |
-| `src/inference.py` | v1 inference on Indian data |
-| `src/inference_v2.py` | v2 inference with fragility multipliers and risk level classification |
-
----
-
-##  Model Performance
-
-### v2 Model (26 features, threshold = 0.55)
+**v2 performance (threshold = 0.55):**
 
 | Metric | Value |
 |---|---|
-| **Accuracy** | **74.4%** |
-| **Recall** | **51.6%** |
-| **Precision** | **27.0%** |
-| **F1 Score** | **0.354** |
+| Accuracy | 74.4% |
+| Recall | 51.6% |
+| Precision | 27.0% |
+| F1 Score | 0.354 |
 
-> **Design choice:** The model is intentionally tuned for higher recall (catching outages) at the cost of precision (more false alarms). For a safety/alerting tool, missing a real outage is far worse than a false warning.
+The model is tuned for higher recall at the cost of precision. For an alerting system, missing a real outage is weighted more heavily than issuing a false warning.
 
-### Top 5 Features (by importance)
-1. `temp_x_humidity` — Combined thermal-moisture stress
-2. `is_summer` — Summer = highest risk season
-3. `month` — Seasonal patterns
-4. `surface_pressure` — Low pressure signals storms
-5. `is_monsoon` — Monsoon period flag
+**Top features (v2):** `temp_x_humidity`, `is_summer`, `month`, `surface_pressure`, `is_monsoon`
 
-### Risk Level Definitions
-| Level | Probability | Meaning |
+**Risk thresholds:**
+
+| Level | Probability |
+|---|---|
+| LOW | below 30% |
+| MODERATE | 30% to 50% |
+| HIGH | 50% to 70% |
+| CRITICAL | 70% and above |
+
+### Infrastructure fragility scores
+
+Derived from UPERC/PFC FY 2023-24 DISCOM distribution loss data. Same raw weather risk produces different adjusted scores depending on local grid quality.
+
+| City | DISCOM | Fragility Score |
 |---|---|---|
-| 🟢 LOW | < 30% | Grid is safe |
-| 🟡 MODERATE | 30–50% | Elevated caution |
-| 🟠 HIGH | 50–70% | Significant outage risk |
-| 🔴 CRITICAL | ≥ 70% | Grid failure highly likely |
+| Noida | PVVNL (A+) | 0.93 |
+| Ghaziabad | PVVNL (A+) | 1.00 |
+| Meerut | PVVNL (A+) | 1.07 |
+| Lucknow | MVVNL (B-) | 1.13 |
+| Agra | DVVNL (B-) | 1.27 |
+| Firozabad | DVVNL (B-) | 1.40 |
+
+### Rain hazard calibration
+
+The US-trained model underweights rain and wind as failure drivers relative to Indian grid conditions. The ML service applies tiered multipliers to raw risk before fragility adjustment:
+
+| Condition | Multiplier |
+|---|---|
+| Light rain (0 to 2 mm) | 1.10x |
+| Moderate rain (2 to 5 mm) | 1.20x |
+| Heavy rain (above 5 mm) | 1.30x |
+| Rain above 2 mm with wind above 15 km/h | 1.40x |
+
+See `Research/rain_calibration.md` for the calibration analysis.
 
 ---
 
-##  Infrastructure Fragility Scores
-
-Inspired by [Wang et al. (2024)](https://doi.org/10.xxxx) — same weather causes different outage rates depending on local infrastructure quality. Scores are derived from **official DISCOM distribution loss data** (UPERC/PFC FY 2023-24).
-
-| City | DISCOM | Rating | Fragility Score | Impact on 45% raw risk |
-|---|---|---|---|---|
-| Noida | PVVNL | A+ | 0.93 | → 41.9% |
-| Ghaziabad | PVVNL | A+ | 1.00 | → 45.0% |
-| Meerut | PVVNL | A+ | 1.07 | → 48.2% |
-| Lucknow | MVVNL | B- | 1.13 | → 50.9% |
-| Agra | DVVNL | B- | 1.27 | → 57.2% |
-| Firozabad | DVVNL | B- | 1.40 | → **63.0%** |
-
----
-
-##  Research Foundation
-
-This project is informed by systematic review of 4 academic papers:
-
-1. **Ghasemkhani et al. (2024)** — *Primary blueprint.* XGBoost + MRMR feature selection → 97.66% accuracy on US outage data.
-2. **Wang et al. (2024, Wayne State)** — Infrastructure density & socio-economic conditioning → inspired our fragility multiplier.
-3. **LSTM-based temporal models** — Sequential outage prediction (cited as future scope).
-4. **Graph Neural Networks** — Spatial cascade modeling across substations (cited as future scope).
-
----
-
-##  Setup & Installation
+## Installation
 
 ### Prerequisites
-- Python 3.10+
-- ~2 GB disk space for data files (shared separately)
 
-### Clone & Install
+- Python 3.10+
+- Node.js 18+ (for the web frontend)
+- Convex account (for backend deployment)
+- Approximately 2 GB disk space for training data files (not included in the repository)
+
+### Clone the repository
+
 ```bash
-git clone https://github.com/amisha-srivastavaa/Project_Beyond-the-blackbox.git
-cd Project_Beyond-the-blackbox
+git clone https://github.com/amisha-srivastavaa/DrishtiX.git
+cd DrishtiX
+```
+
+### ML training environment
+
+Create a Python virtual environment and install dependencies for the offline pipeline:
+
+```bash
 python -m venv venv
-source venv/bin/activate    # On Windows: venv\Scripts\activate
+
+# Linux / macOS
+source venv/bin/activate
+
+# Windows
+venv\Scripts\activate
+
+pip install pandas numpy xgboost scikit-learn matplotlib mrmr requests
+```
+
+### ML service (inference API)
+
+```bash
+cd ml-service
 pip install -r requirements.txt
 ```
 
-### Data Setup
-The `data/` directory is not included in the repository due to file size limits (~2 GB). **Obtain the data files from the team's shared drive** and place them in a `data/` folder at the project root:
+The service loads `models/xgboost_model_v2.json` from the parent directory at startup.
+
+### Web application
+
+```bash
+cd web
+npm install
+```
+
+Set up Convex and link the project:
+
+```bash
+npx convex dev
+# Follow prompts to create or link a Convex project
+```
+
+Configure authentication and environment variables in the Convex dashboard:
+
+```bash
+# Required in Convex Dashboard > Settings > Environment Variables
+ML_SERVICE_URL=<your-deployed-ml-service-url>
+
+# Additional auth variables per your Convex Auth provider setup
+# e.g., AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET
+```
+
+### Training data setup
+
+Large CSV files are excluded from the repository. Place them in a `data/` directory at the project root:
 
 ```
 data/
-├── outage_data_2023.csv           # Raw EAGLE-I dataset (1.2 GB)
-├── eagle_i_filtered.csv           # Filtered to 6 US states (77 MB)
-├── us_training_data.csv           # Outage + weather merged (135 MB)
-├── us_training_final.csv          # v1 engineered features (186 MB)
-├── us_training_v2.csv             # v2 engineered features (354 MB)
-├── weather_data.csv               # UP/NCR raw weather (5 MB)
-├── engineered_data.csv            # UP/NCR engineered features (7.7 MB)
-├── up_predictions.csv             # v1 predictions (9 MB)
-├── up_predictions_v2.csv          # v2 predictions (22 MB)
-├── dvvnl_power_map.xlsx           # DVVNL utility reference
-└── dvvnl_roaster.pdf              # DVVNL utility reference
+├── outage_data_2023.csv       # Raw EAGLE-I dataset (~1.2 GB)
+├── eagle_i_filtered.csv       # Filtered to 6 US states (~77 MB)
+├── us_training_data.csv       # Outage + weather merged (~135 MB)
+├── us_training_final.csv      # v1 engineered features (~186 MB)
+├── us_training_v2.csv         # v2 engineered features (~354 MB)
+├── weather_data.csv           # UP/NCR raw weather (~5 MB)
+├── engineered_data.csv        # UP/NCR engineered features (~7.7 MB)
+├── up_predictions.csv         # v1 batch predictions
+└── up_predictions_v2.csv      # v2 batch predictions
 ```
 
 ---
 
-## 📁 Project Structure
+## Usage
+
+### Offline ML pipeline
+
+Run scripts from the project root with the virtual environment active. Stages are sequential.
+
+```bash
+# Stage 1: Prepare US training data
+python src/filter_eagle_i.py
+python src/fetch_us_weather.py
+python src/engineer_us_features.py
+
+# Stage 2: Train and evaluate models
+python src/train_model.py
+python src/enhance_and_retrain.py
+python src/mrmr_selection.py
+
+# Stage 3: Generate predictions for UP/NCR cities
+python src/fetch_weather.py
+python src/feature_engineering.py
+python src/inference_v2.py
+```
+
+### ML service (local)
+
+```bash
+cd ml-service
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Example request:
+
+```bash
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "city_id": "lucknow",
+    "current_weather": {
+      "timestamp": 1713369600000,
+      "temperature_2m": 38.0,
+      "relative_humidity_2m": 72,
+      "precipitation": 0.5,
+      "wind_speed_10m": 15.0,
+      "cloud_cover": 80,
+      "surface_pressure": 1005.0,
+      "wind_gusts_10m": 22.0,
+      "dewpoint_2m": 28.0,
+      "shortwave_radiation": 450.0,
+      "weather_code": 95
+    },
+    "cached_history": []
+  }'
+```
+
+Deploy the service to a cloud host (Render, Railway, or similar) and set `ML_SERVICE_URL` in Convex to the deployed endpoint.
+
+### Web dashboard (local development)
+
+```bash
+cd web
+npx convex dev    # Terminal 1: Convex backend
+npm run dev       # Terminal 2: Vite dev server
+```
+
+The dashboard subscribes to the `predictions` table for live updates when the hourly cron is active. A simulation mode with static mock data is available when Convex is not connected.
+
+### Deploy ML service
+
+```bash
+# Example: deploy to Render / Railway
+# Set start command:
+uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+
+---
+
+## Project Structure
 
 ```
-Project_Beyond-the-blackbox/
-│
-├── src/                            # All source code
-│   ├── filter_eagle_i.py           # Stage 1: Filter EAGLE-I data
-│   ├── fetch_us_weather.py         # Stage 1: Fetch & merge US weather
-│   ├── engineer_us_features.py     # Stage 1: Feature engineering (US)
-│   ├── train_model.py              # Stage 2: Train XGBoost v1
-│   ├── enhance_and_retrain.py      # Stage 2: v2 features + retrain
-│   ├── mrmr_selection.py           # Stage 2: MRMR feature selection
-│   ├── fetch_weather.py            # Stage 3: Fetch UP/NCR weather
-│   ├── feature_engineering.py      # Stage 3: Feature engineering (India)
-│   ├── inference.py                # Stage 3: v1 inference
-│   └── inference_v2.py             # Stage 3: v2 inference
-│
-├── models/                         # Trained models & artifacts
-│   ├── xgboost_model.json          # v1 trained model
-│   ├── xgboost_model_v2.json       # v2 trained model (production)
-│   ├── training_metrics.json       # v1 evaluation metrics
-│   ├── training_metrics_v2.json    # v2 evaluation metrics
-│   ├── model_config.json           # Threshold config (0.55)
-│   ├── fragility_scores.json       # DISCOM-based city fragility scores
-│   ├── mrmr_features.json          # MRMR feature ranking
-│   ├── feature_importance.png      # v1 feature importance chart
-│   └── threshold_analysis.png      # Threshold optimization chart
-│
-├── Research/                       # Academic papers & documentation
-│   ├── project_progress.md         # Detailed project documentation
-│   ├── StrategyChange.md           # Data strategy pivot notes
-│   ├── Paper1-4.pdf                # Reference papers
-│   └── *.txt                       # Extracted paper text
-│
-├── data/                           # ⚠️ Not in repo — see Data Setup
-├── .gitignore
-├── requirements.txt
+DrishtiX/
+├── src/                        # Offline ML pipeline scripts
+├── ml-service/                 # FastAPI inference microservice
+│   ├── main.py                 # API entry point
+│   ├── model.py                # Feature engineering and prediction
+│   ├── explainability.py       # Plain-English explanation generation
+│   └── config.py               # City, feature, and threshold configuration
+├── web/                        # React + Convex application
+│   ├── src/                    # Frontend components
+│   └── convex/                 # Database schema, crons, queries, mutations
+├── models/                     # Trained model artifacts (committed)
+├── data/                       # Training data (gitignored; see Installation)
+├── Research/                   # Papers, calibration notes, project documentation
+├── android-app (reference)/  # Reference mobile app scaffold
 └── README.md
 ```
 
 ---
 
+## Research Foundation
+
+Architecture and methodology are informed by four primary papers:
+
+1. **Ghasemkhani et al. (2024)** — XGBoost with MRMR feature selection for outage duration prediction. Primary blueprint for model choice and evaluation framing. [DOI: 10.3390/s24134313](https://doi.org/10.3390/s24134313)
+2. **Wang et al. (2024)** — Weather-related outage prediction with socio-economic and infrastructure data. Basis for the fragility multiplier approach. [arXiv: 2404.03115](https://arxiv.org/abs/2404.03115)
+3. **Fatehi et al. (2024)** — LSTM-based temporal models. Documented as a future upgrade path (LSTM-XGBoost hybrid).
+4. **Chen et al. (2025)** — Graph Neural Networks for spatial outage cascade modeling. Documented as future scope.
+
+Additional technical documentation: [`Research/project_progress.md`](Research/project_progress.md)
+
+---
+
 ## Known Limitations
 
-1. **Cross-Continental Transfer Gap** — Model learned US grid failure patterns (heat-dominated). Indian grids fail differently (rain, overloaded transformers, poor maintenance).
-2. **Weather-Only Features** — No access to utility-specific data (equipment age, maintenance logs, load curves).
-3. **Precision Trade-off** — High recall tuning means many warnings won't result in actual outages (~73% false alarm rate).
-4. **Class Imbalance** — Only 13.6% of training data represents outage events.
+1. **Transfer learning gap** — The model learns US failure patterns where heat is the primary driver. Indian outages are also driven by rain, overloaded transformers, and maintenance gaps.
+2. **Weather-only features** — No utility-specific inputs (equipment age, maintenance logs, load curves).
+3. **Precision trade-off** — Recall-focused tuning produces a high false-alarm rate relative to actual outages.
+4. **Class imbalance** — Outage events represent 13.6% of US training data, which limits achievable precision.
+5. **Scheduled outage detection** — UPPCL notice integration is planned but not yet implemented in the live pipeline.
 
 ---
 
@@ -212,25 +361,29 @@ Project_Beyond-the-blackbox/
 
 | Task | Status |
 |---|---|
-| Data pipeline (filter → merge → engineer) | ✅ Complete |
-| XGBoost v1 training (13 features) | ✅ Complete |
-| XGBoost v2 training (26 features) | ✅ Complete |
-| MRMR feature selection analysis | ✅ Complete |
-| Threshold optimization | ✅ Complete |
-| Infrastructure fragility scoring | ✅ Complete |
-| Indian city inference (6 cities × 2 years) | ✅ Complete |
-| Rain hazard adjustment for Indian conditions | 🔲 Pending |
-| Backend API (FastAPI) | 🔲 Pending |
-| Frontend Dashboard (risk map + charts) | 🔲 Pending |
-| Real-time forecast mode (next 24–48 hours) | 🔲 Pending |
-| Push notification system for CRITICAL alerts | 🔲 Pending |
+| Data pipeline (filter, merge, engineer) | Complete |
+| XGBoost v1 and v2 training | Complete |
+| MRMR feature selection analysis | Complete |
+| Threshold optimization | Complete |
+| Infrastructure fragility scoring | Complete |
+| Rain hazard calibration layer | Complete |
+| FastAPI ML service | Complete |
+| Convex backend and hourly cron | Complete |
+| React dashboard | Complete |
+| Scheduled outage prediction (UPPCL notices) | Pending |
+| Push notification system | Pending |
+| Real-time 24 to 48 hour forecast mode | Pending |
+| LSTM temporal layer | Future scope |
+| Graph Neural Network cascade modeling | Future scope |
 
 ---
 
 ## Team
 
- Team NERV
+Team NERV
 
 ---
 
-*For detailed technical documentation, see [`Research/project_progress.md`](Research/project_progress.md).*
+## License
+
+Academic / hackathon project. Contact the repository owner for usage terms.

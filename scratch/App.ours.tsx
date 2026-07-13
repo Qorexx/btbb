@@ -233,65 +233,22 @@ export default function App({ isConvexConnected = false }: { isConvexConnected?:
   const [simulation, setSimulation] = useState<SimulationType>('none');
   const [historicalMode, setHistoricalMode] = useState<boolean>(false);
   
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [showDashboard, setShowDashboard] = useState(false);
-  const [sweepActive, setSweepActive] = useState(false);
-
-  useEffect(() => {
-    const cached = localStorage.getItem("btb_user");
-    if (cached) {
-      setShowDashboard(true);
-    }
-  }, []);
-
-  const handleEnter = (profile: any) => {
-    setIsTransitioning(true);
-    setSweepActive(true);
-
-    setTimeout(() => {
-      localStorage.setItem("btb_user", JSON.stringify(profile));
-      setShowDashboard(true);
-    }, 800);
-
-    setTimeout(() => {
-      setIsTransitioning(false);
-      setSweepActive(false);
-    }, 1500);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("btb_user");
-    setShowDashboard(false);
-  };
-
   const weather = MOCK_WEATHER[currentCityId] || MOCK_WEATHER.noida;
 
   const appProps = {
     activeTab, setActiveTab, currentCityId, setCurrentCityId,
-    simulation, setSimulation, historicalMode, setHistoricalMode,
-    onLogout: handleLogout
+    simulation, setSimulation, historicalMode, setHistoricalMode
   };
 
   return (
     <>
-      <div className={`scanline-sweep ${sweepActive ? 'sweep-active' : ''}`} />
-      
-      {showDashboard ? (
-        <>
-          <BackgroundVideo condition={weather.condition} />
-          {isConvexConnected ? (
-            <ConvexConnectedApp {...appProps} />
-          ) : (
-            <SimulatedApp {...appProps} />
-          )}
-          <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
-        </>
+      <BackgroundVideo condition={weather.condition} />
+      {isConvexConnected ? (
+        <ConvexConnectedApp {...appProps} />
       ) : (
-        <>
-          <BackgroundVideo condition="clear" isTransitioning={isTransitioning} />
-          <LandingPage onEnter={handleEnter} isTransitioning={isTransitioning} />
-        </>
+        <SimulatedApp {...appProps} />
       )}
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </>
   );
 }
@@ -306,7 +263,6 @@ interface AppSubProps {
   setSimulation: (sim: SimulationType) => void;
   historicalMode: boolean;
   setHistoricalMode: (mode: boolean) => void;
-  onLogout?: () => void;
 }
 
 function ConvexConnectedApp({ activeTab, setActiveTab, currentCityId, setCurrentCityId, simulation, setSimulation, historicalMode, setHistoricalMode }: AppSubProps) {
@@ -559,7 +515,6 @@ interface DashboardViewProps {
   onAddReport: (report: Omit<CitizenReport, "_id" | "status" | "_creationTime">) => void;
   onCycleStatus: (reportId: string, currentStatus: 'pending' | 'verified' | 'resolved') => void;
   simulation: SimulationType;
-  onLogout?: () => void;
 }
 
 function DashboardView({
@@ -572,8 +527,7 @@ function DashboardView({
   weather,
   onAddReport,
   onCycleStatus,
-  simulation,
-  onLogout
+  simulation
 }: DashboardViewProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [newReportType, setNewReportType] = useState<'outage' | 'voltage_fluctuation' | 'sparking' | 'infrastructure_damage'>('outage');
@@ -665,15 +619,6 @@ function DashboardView({
             <span className="connection-badge">
               <span className="pulse-dot" style={{ backgroundColor: '#71717a' }}></span> SYSTEM SIMULATION
             </span>
-          )}
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              className="glass-btn"
-              style={{ marginLeft: 12, padding: '4px 10px', fontSize: '0.62rem', minHeight: 0, fontWeight: 700 }}
-            >
-              LOGOUT
-            </button>
           )}
         </div>
       </header>
@@ -1027,7 +972,7 @@ function DashboardView({
 }
 
 // ── COMPONENT 5: BACKGROUND VIDEO ──
-function BackgroundVideo({ condition, isTransitioning = false }: { condition: string; isTransitioning?: boolean }) {
+function BackgroundVideo({ condition }: { condition: string }) {
   const [videoIndex, setVideoIndex] = useState(0);
 
   useEffect(() => {
@@ -1066,7 +1011,18 @@ function BackgroundVideo({ condition, isTransitioning = false }: { condition: st
       playsInline
       loop={videoList.length === 1}
       onEnded={videoList.length > 1 ? handleEnded : undefined}
-      className={`background-video ${isTransitioning ? 'warp-active' : ''}`}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        objectFit: 'cover',
+        zIndex: -2,
+        opacity: 1,
+        filter: 'brightness(0.75)',
+        pointerEvents: 'none',
+      }}
     />
   );
 }
@@ -1912,189 +1868,3 @@ function ProfileView({ currentCityId, simulation, setSimulation, historicalMode,
     </div>
   );
 }
-// ── COMPONENT 7: LANDING PAGE ──
-function LandingPage({
-  onEnter,
-  isTransitioning,
-}: {
-  onEnter: (profile: any) => void;
-  isTransitioning: boolean;
-}) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [selectedCity, setSelectedCity] = useState('');
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [isFormLoading, setIsFormLoading] = useState(false);
-
-  const isFormValid = name.trim() && email.includes('@') && phone.trim() && selectedCity;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isFormValid) return;
-    setIsFormLoading(true);
-    setTimeout(() => {
-      setIsFormLoading(false);
-      onEnter({ name, email, phone, city: selectedCity });
-    }, 800);
-  };
-
-  const handleGoogleAuth = () => {
-    setIsGoogleLoading(true);
-    setTimeout(() => {
-      setIsGoogleLoading(false);
-      onEnter({
-        name: 'John Doe',
-        email: 'john.doe@gmail.com',
-        phone: '+91 99999 88888',
-        city: 'noida',
-      });
-    }, 1200);
-  };
-
-  const citiesList = [
-    { id: 'lucknow', name: 'Lucknow' },
-    { id: 'noida', name: 'Noida' },
-    { id: 'ghaziabad', name: 'Ghaziabad' },
-    { id: 'firozabad', name: 'Firozabad' },
-    { id: 'agra', name: 'Agra' },
-    { id: 'meerut', name: 'Meerut' },
-  ];
-
-  return (
-    <div className="landing-wrapper">
-      <div className={`landing-card ${isTransitioning ? 'card-exit' : ''}`}>
-        <div className="landing-logo-container">
-          <div className="landing-logo-icon">
-            {/* Electrical Pylon BTB Logo SVG */}
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2v20M5 12h14M2 17h20M9 7h6" />
-              <circle cx="12" cy="12" r="3" fill="#34C759" stroke="none" />
-            </svg>
-          </div>
-          <h2 className="landing-logo-text">BT<span>B</span></h2>
-        </div>
-
-        <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '2.2rem', fontWeight: 700, margin: '0 0 8px', letterSpacing: '-0.5px' }}>
-          Citizen Portal
-        </h1>
-        <p className="landing-subtext">
-          Register to access your 24-hour city dashboard.
-        </p>
-
-        <form onSubmit={handleSubmit} className="landing-form">
-          <div className="form-group">
-            <span className="input-label">Full Name</span>
-            <div className="input-with-icon">
-              <span className="input-icon">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              </span>
-              <input
-                type="text"
-                placeholder="John Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="input-field"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <span className="input-label">Email Address</span>
-            <div className="input-with-icon">
-              <span className="input-icon">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                  <polyline points="22,6 12,13 2,6" />
-                </svg>
-              </span>
-              <input
-                type="email"
-                placeholder="john@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input-field"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <span className="input-label">Phone Number</span>
-            <div className="input-with-icon">
-              <span className="input-icon">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                </svg>
-              </span>
-              <input
-                type="tel"
-                placeholder="+91 98765 43210"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="input-field"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <span className="input-label">Select Your City</span>
-            <div className="city-grid-select">
-              {citiesList.map((city) => (
-                <button
-                  key={city.id}
-                  type="button"
-                  onClick={() => setSelectedCity(city.id)}
-                  className={`city-select-btn ${selectedCity === city.id ? 'active' : ''}`}
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="10" r="3" />
-                    <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z" />
-                  </svg>
-                  {city.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={!isFormValid || isFormLoading}
-            className={`submit-btn ${isFormValid ? 'ready' : ''}`}
-            style={{ marginTop: 8 }}
-          >
-            {isFormLoading ? 'Verifying...' : 'Enter Dashboard'}
-          </button>
-        </form>
-
-        <div className="divider-row">
-          <div className="divider-line"></div>
-          <span className="divider-text">OR</span>
-          <div className="divider-line"></div>
-        </div>
-
-        <button onClick={handleGoogleAuth} disabled={isGoogleLoading} className="google-auth-btn">
-          {isGoogleLoading ? (
-            <span className="empty-state" style={{ padding: 0, color: '#fff', fontSize: '0.85rem' }}>Signing in...</span>
-          ) : (
-            <>
-              <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
-              </svg>
-              Continue with Google
-            </>
-          )}
-        </button>
-      </div>
-    </div>
-  );
-}
-

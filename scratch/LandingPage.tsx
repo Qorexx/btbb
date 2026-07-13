@@ -1,0 +1,4 @@
+function LandingPage({
+  onEnter,
+  isTransitioning,
+}: {
