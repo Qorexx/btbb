@@ -8,13 +8,23 @@
  * @module
  */
 
+import type * as auth from "../auth.js";
+import type * as crons from "../crons.js";
+import type * as predictions from "../predictions.js";
+import type * as reports from "../reports.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  auth: typeof auth;
+  crons: typeof crons;
+  predictions: typeof predictions;
+  reports: typeof reports;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.

@@ -1,0 +1,79 @@
+/* ── Bottom Nav Bar ── */
+.bottom-nav {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(4px) saturate(180%) contrast(1.2) url(#glass-distortion);
+  -webkit-backdrop-filter: blur(12px) saturate(180%) contrast(1.2) url(#glass-distortion);
+  border-radius: 50px;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.15),
+    inset 0 2px 0 rgba(255, 255, 255, 0.3);
+  z-index: 1000;
+  animation: nav-slide-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes nav-slide-up {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 40px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 16px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--text-secondary);
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: var(--text-main);
+}
+
+.nav-item.active {
+  color: #fa2d48;
+  /* Apple Music Pink/Red */
+}
+
+.nav-item.active:hover {
+  background: rgba(250, 45, 72, 0.1);
+}
+
+.nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.nav-item.active .nav-icon {
+  transform: scale(1.15);
+}
+
+.nav-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}

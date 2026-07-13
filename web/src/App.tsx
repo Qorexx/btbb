@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import './App.css';
+import './nav.css';
 
 // ── TYPES DEFINITIONS ──
 interface ExplanationFactor {
@@ -38,6 +39,14 @@ interface CitizenReport {
   _creationTime?: number;
 }
 
+interface WeatherSnapshot {
+  temp: number;
+  humidity: number;
+  windSpeed: number;
+  condition: string;
+  alerts?: string[];
+}
+
 interface CityConfig {
   id: string;
   name: string;
@@ -58,6 +67,15 @@ const CITIES: CityConfig[] = [
 ];
 
 // ── MINIMALIST TELEMETRY STATIC MOCK DATA ──
+const MOCK_WEATHER: Record<string, WeatherSnapshot> = {
+  noida: { temp: 34, humidity: 65, windSpeed: 12, condition: "Partly Cloudy" },
+  ghaziabad: { temp: 35, humidity: 62, windSpeed: 10, condition: "Clear" },
+  meerut: { temp: 36, humidity: 68, windSpeed: 8, condition: "Haze" },
+  lucknow: { temp: 38, humidity: 72, windSpeed: 15, condition: "Thunderstorms", alerts: ["Severe Thunderstorm Watch"] },
+  agra: { temp: 40, humidity: 55, windSpeed: 22, condition: "Dust Storm", alerts: ["High Wind Warning", "Dust Storm Advisory"] },
+  firozabad: { temp: 41, humidity: 50, windSpeed: 18, condition: "Clear", alerts: ["Extreme Heat Warning"] },
+};
+
 const MOCK_PREDICTIONS: Record<string, Prediction> = {
   noida: {
     cityId: "noida",
@@ -171,8 +189,8 @@ const generateMockHistory = (cityId: string, baseRisk: number): { timestamp: num
   const history = [];
   const now = Date.now();
   let currentVal = baseRisk;
-  for (let i = 24; i >= 0; i--) {
-    const time = now - i * 3600000;
+  for (let i = 0; i <= 24; i++) {
+    const time = now + i * 3600000;
     const change = (Math.random() - 0.5) * 0.12;
     currentVal = Math.max(0.05, Math.min(0.95, currentVal + change));
     let adjustedVal = currentVal;
@@ -187,20 +205,14 @@ const generateMockHistory = (cityId: string, baseRisk: number): { timestamp: num
 export default function App({ isConvexConnected = false }: { isConvexConnected?: boolean }) {
   return (
     <>
-      <div className="bg-decorations">
-        <div className="ambient-glow glow-1"></div>
-        <div className="ambient-glow glow-2"></div>
-        <div className="bg-shape shape-1"></div>
-        <div className="bg-shape shape-2"></div>
-        <div className="bg-shape shape-3"></div>
-        <div className="bg-shape shape-4"></div>
-      </div>
+
       
       {isConvexConnected ? (
         <ConvexConnectedApp />
       ) : (
         <SimulatedApp />
       )}
+      <BottomNav />
     </>
   );
 }
@@ -279,6 +291,7 @@ function ConvexConnectedApp() {
       prediction={activePrediction}
       history={historyData}
       reports={activeReports}
+      weather={MOCK_WEATHER[currentCityId] || MOCK_WEATHER.noida}
       onAddReport={handleAddReport}
       onCycleStatus={handleCycleStatus}
     />
@@ -290,21 +303,17 @@ function SimulatedApp() {
   const [currentCityId, setCurrentCityId] = useState<string>("noida");
   const [localReports, setLocalReports] = useState<CitizenReport[]>(MOCK_REPORTS);
   const [predictionsMap, setPredictionsMap] = useState<Record<string, Prediction>>(MOCK_PREDICTIONS);
-  const [historyCache, setHistoryCache] = useState<Record<string, { timestamp: number; risk: number }[]>>({});
+  const historyCache = useRef<Record<string, { timestamp: number; risk: number }[]>>({});
 
   const activePrediction = predictionsMap[currentCityId] || MOCK_PREDICTIONS.noida;
   const activeReports = localReports.filter(r => r.cityId === currentCityId);
 
-  const getHistoryForActive = () => {
-    if (!historyCache[currentCityId]) {
-      const generated = generateMockHistory(currentCityId, activePrediction.adjustedRisk);
-      setHistoryCache(prev => ({ ...prev, [currentCityId]: generated }));
-      return generated;
+  const historyData = useMemo(() => {
+    if (!historyCache.current[currentCityId]) {
+      historyCache.current[currentCityId] = generateMockHistory(currentCityId, activePrediction.adjustedRisk);
     }
-    return historyCache[currentCityId];
-  };
-
-  const historyData = getHistoryForActive();
+    return historyCache.current[currentCityId];
+  }, [currentCityId, activePrediction.adjustedRisk]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -330,19 +339,20 @@ function SimulatedApp() {
         return next;
       });
 
-      setHistoryCache(prev => {
-        const next = { ...prev };
-        Object.keys(next).forEach(cid => {
-          const hist = [...next[cid]];
+      const nextCache = { ...historyCache.current };
+      Object.keys(nextCache).forEach(cid => {
+        if (nextCache[cid]) {
+          const hist = [...nextCache[cid]];
           hist.shift();
+          const lastTimestamp = hist[hist.length - 1].timestamp;
           hist.push({
-            timestamp: Date.now(),
-            risk: predictionsMap[cid]?.adjustedRisk || 0.2
+            timestamp: lastTimestamp + 3600000,
+            risk: Math.max(0.05, Math.min(0.95, (predictionsMap[cid]?.adjustedRisk || 0.2) + (Math.random() - 0.5) * 0.1))
           });
-          next[cid] = hist;
-        });
-        return next;
+          nextCache[cid] = hist;
+        }
       });
+      historyCache.current = nextCache;
     }, 10000);
 
     return () => clearInterval(interval);
@@ -377,6 +387,7 @@ function SimulatedApp() {
       prediction={activePrediction}
       history={historyData}
       reports={activeReports}
+      weather={MOCK_WEATHER[currentCityId] || MOCK_WEATHER.noida}
       onAddReport={handleAddReport}
       onCycleStatus={handleCycleStatus}
     />
@@ -391,6 +402,7 @@ interface DashboardViewProps {
   prediction: Prediction;
   history: { timestamp: number; risk: number }[];
   reports: CitizenReport[];
+  weather: WeatherSnapshot;
   onAddReport: (report: Omit<CitizenReport, "_id" | "status" | "_creationTime">) => void;
   onCycleStatus: (reportId: string, currentStatus: 'pending' | 'verified' | 'resolved') => void;
 }
@@ -402,6 +414,7 @@ function DashboardView({
   prediction,
   history,
   reports,
+  weather,
   onAddReport,
   onCycleStatus
 }: DashboardViewProps) {
@@ -440,12 +453,15 @@ function DashboardView({
   };
 
   const svgWidth = 600;
-  const svgHeight = 150;
-  const padding = 20;
+  const svgHeight = 320;
+  const padLeft = 45;
+  const padRight = 20;
+  const padTop = 20;
+  const padBottom = 35;
 
   const points = history.map((h, i) => {
-    const x = padding + (i / (history.length - 1)) * (svgWidth - padding * 2);
-    const y = svgHeight - padding - h.risk * (svgHeight - padding * 2);
+    const x = padLeft + (i / (history.length - 1)) * (svgWidth - padLeft - padRight);
+    const y = svgHeight - padBottom - h.risk * (svgHeight - padTop - padBottom);
     return { x, y, val: h.risk, label: new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
   });
 
@@ -463,10 +479,11 @@ function DashboardView({
     }
   }
 
-  const areaD = pathD ? `${pathD} L ${points[points.length - 1].x} ${svgHeight - padding} L ${points[0].x} ${svgHeight - padding} Z` : '';
+  const areaD = pathD ? `${pathD} L ${points[points.length - 1].x} ${svgHeight - padBottom} L ${points[0].x} ${svgHeight - padBottom} Z` : '';
 
   return (
     <div style={{ paddingBottom: 60 }}>
+      <BackgroundVideo condition={weather.condition} />
       {/* Header Bar */}
       <header className="page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -497,8 +514,10 @@ function DashboardView({
       {/* Dashboard Core Layout */}
       <div className="dashboard-container">
         
-        {/* Sidebar */}
-        <aside className="sidebar glass-panel">
+        {/* TOP ROW: Sidebar + Main Stats */}
+        <div className="dashboard-top-row">
+          {/* Sidebar */}
+          <aside className="sidebar glass-panel">
           <div className="brand-section">
             <div className="brand-text" style={{ textAlign: 'left' }}>
               <h1 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>Grid Nodes</h1>
@@ -537,49 +556,61 @@ function DashboardView({
         <main className="main-content main-card">
           
           {/* Active City Details Banner */}
-          <div className="top-bar glass-panel">
-            <div className="current-city-details" style={{ textAlign: 'left' }}>
+          <div className="top-bar">
+            <div className="current-city-details" style={{ textAlign: 'center' }}>
               <h2>{activeCity.name} Node</h2>
               <div className="coordinates-discom">
                 <span>{activeCity.lat.toFixed(2)}° N, {activeCity.lon.toFixed(2)}° E</span>
                 <span>DISCOM: <strong className="discom-tag">{activeCity.discom}</strong></span>
               </div>
             </div>
-            
-            <button className="glass-btn glass-btn-primary" onClick={() => setModalOpen(true)}>
-              Report Incident
-            </button>
           </div>
 
           {/* Grid Panel Layout */}
           <div className="grid-container">
             
             {/* Risk Value Block */}
-            <div className="risk-card glass-panel glass-panel-hover" style={{ textAlign: 'left' }}>
-              <div>
+            <div className="risk-card glass-panel glass-panel-hover" style={{ alignItems: 'center', justifyContent: 'center' }}>
+              
+              <div style={{ position: 'absolute', top: 20, left: 24 }}>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Calculated Failure Risk</span>
-                <div className="metric-value-large">
+              </div>
+              
+              <div className="circular-progress-container" style={{ position: 'relative', width: 150, height: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 15 }}>
+                <svg width="150" height="150" viewBox="0 0 150 150" style={{ transform: 'rotate(-90deg)', position: 'absolute', top: 0, left: 0 }}>
+                  {/* Background track */}
+                  <circle cx="75" cy="75" r="65" fill="transparent" stroke="rgba(255,255,255,0.1)" strokeWidth="14" />
+                  {/* Progress track */}
+                  <circle 
+                    cx="75" cy="75" r="65" 
+                    fill="transparent" 
+                    stroke={
+                      Math.round(prediction.adjustedRisk * 100) < 33 ? '#34C759' : 
+                      Math.round(prediction.adjustedRisk * 100) <= 66 ? '#FFCC00' : 
+                      '#FF3B30'
+                    } 
+                    strokeWidth="14" 
+                    strokeDasharray={2 * Math.PI * 65} 
+                    strokeDashoffset={(2 * Math.PI * 65) - ((2 * Math.PI * 65) * Math.min(prediction.adjustedRisk, 1))} 
+                    strokeLinecap="round" 
+                    style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s ease' }} 
+                  />
+                </svg>
+                <div className="metric-value-large" style={{ margin: 0 }}>
                   {Math.round(prediction.adjustedRisk * 100)}
                   <span className="metric-unit">%</span>
                 </div>
               </div>
-              
-              <div style={{ width: '100%' }}>
-                <div className="risk-tag-row">
+
+              <div style={{ position: 'absolute', bottom: 20, left: 24, right: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="risk-tag-row" style={{ margin: 0 }}>
                   <span className={`status-badge ${currentRiskClass}`} style={{ fontSize: '0.7rem' }}>
                     {prediction.riskLevel}
                   </span>
-                  <span className="risk-level-heading">Classification Status</span>
                 </div>
-                
-                {/* Horizontal minimalist progress track */}
-                <div style={{ width: '100%', height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, marginTop: 12 }}>
-                  <div style={{ width: `${prediction.adjustedRisk * 100}%`, height: '100%', background: '#fff', borderRadius: 2 }} />
-                </div>
-
-                <p className="fragility-info" style={{ margin: '12px 0 0 0', padding: '10px 0 0 0' }}>
-                  Infrastructure vulnerability multiplier: <strong className="fragility-highlight">{activeCity.fragility.toFixed(2)}x</strong>
-                </p>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  Fragility: <strong className="fragility-highlight">{activeCity.fragility.toFixed(2)}x</strong>
+                </span>
               </div>
             </div>
 
@@ -589,7 +620,6 @@ function DashboardView({
                 <div className="section-title">
                   Metrics & Risk Indicators
                 </div>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>XGBoost Telemetry v2</span>
               </div>
 
               <div className="summary-text" style={{ textAlign: 'left' }}>
@@ -615,80 +645,86 @@ function DashboardView({
                 ))}
               </div>
             </div>
+          </div>
+        </main>
+      </div>
 
-            {/* Historical Risk Chart Card */}
-            <div className="chart-card glass-panel">
+        {/* BOTTOM FULL-WIDTH CARDS */}
+        
+        {/* Outage Rates Bar Chart Card */}
+        <div className="bar-chart-card glass-panel full-width-card">
               <div className="section-header">
                 <div className="section-title">
-                  24-Hour Risk Progression
+                  24-Hour Outage Forecast
                 </div>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Historical telemetry logs</span>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Predicted telemetry logs</span>
               </div>
 
-              <div className="chart-svg-container">
-                <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} width="100%" height="100%" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="chartGlow" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#ffffff" stopOpacity="0.06" />
-                      <stop offset="100%" stopColor="#ffffff" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* Horizontal grid lines */}
-                  <line x1={padding} y1={padding} x2={svgWidth - padding} y2={padding} stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-                  <line x1={padding} y1={svgHeight / 2} x2={svgWidth - padding} y2={svgHeight / 2} stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-                  <line x1={padding} y1={svgHeight - padding} x2={svgWidth - padding} y2={svgHeight - padding} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-
-                  {/* Shaded Area */}
-                  {areaD && <path d={areaD} fill="url(#chartGlow)" />}
-
-                  {/* Line Path */}
-                  {pathD && <path d={pathD} fill="none" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />}
-
-                  {/* Nodes & Interactive Points */}
-                  {points.map((pt, i) => (
-                    <g key={i}>
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={hoveredChartPoint?.x === pt.x ? 4 : 2}
-                        fill="#ffffff"
-                        stroke={hoveredChartPoint?.x === pt.x ? '#000000' : 'rgba(255,255,255,0.3)'}
-                        strokeWidth={hoveredChartPoint?.x === pt.x ? 2 : 1}
-                        style={{ cursor: 'pointer', transition: 'all 0.15s' }}
-                        onMouseEnter={() => {
-                          setHoveredChartPoint({
-                            x: pt.x,
-                            y: pt.y,
-                            val: pt.val,
-                            label: pt.label
-                          });
-                        }}
-                        onMouseLeave={() => setHoveredChartPoint(null)}
-                      />
-                    </g>
-                  ))}
-                </svg>
-
-                {/* Tooltip Overlay */}
-                {hoveredChartPoint && (
-                  <div
-                    className="chart-tooltip"
-                    style={{
-                      left: `${(hoveredChartPoint.x / svgWidth) * 100}%`,
-                      top: `${(hoveredChartPoint.y / svgHeight) * 100 - 30}%`,
-                      transform: 'translate(-50%, -100%)'
-                    }}
-                  >
-                    <h4>{hoveredChartPoint.label}</h4>
-                    <p>{Math.round(hoveredChartPoint.val * 100)}% risk</p>
-                  </div>
-                )}
+              <div className="bar-chart-container">
+                {history.map((h, i) => {
+                  const heightPercent = Math.max(5, h.risk * 100);
+                  const isHourMarker = i % 6 === 0 || i === history.length - 1;
+                  
+                  return (
+                    <div key={i} className="bar-chart-column">
+                      <div 
+                        className="bar-chart-bar" 
+                        style={{ 
+                          height: `${Math.max(15, heightPercent)}%`,
+                          background: (h.risk * 100) < 33 ? 'linear-gradient(180deg, #34C759 0%, rgba(52, 199, 89, 0.2) 100%)' 
+                                    : (h.risk * 100) <= 66 ? 'linear-gradient(180deg, #FFCC00 0%, rgba(255, 204, 0, 0.2) 100%)'
+                                    : 'linear-gradient(180deg, #FF3B30 0%, rgba(255, 59, 48, 0.2) 100%)'
+                        }} 
+                      >
+                        <span className="bar-chart-inner-text">{Math.round(h.risk * 100)}%</span>
+                      </div>
+                      <div className="bar-chart-label">
+                        {i === 0 ? 'Now' : `+${i}h`}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
+            {/* Current Weather Snapshot Card */}
+            <div className="weather-card glass-panel full-width-card">
+              <div className="section-header">
+                <div className="section-title">Current Weather Snapshot</div>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Real-time meteorological context</span>
+              </div>
+              <div className="weather-grid">
+                <div className="weather-stat-box">
+                  <span className="weather-label">Temperature</span>
+                  <div className="weather-val">{weather.temp}<span className="weather-unit">°C</span></div>
+                </div>
+                <div className="weather-stat-box">
+                  <span className="weather-label">Humidity</span>
+                  <div className="weather-val">{weather.humidity}<span className="weather-unit">%</span></div>
+                </div>
+                <div className="weather-stat-box">
+                  <span className="weather-label">Wind Speed</span>
+                  <div className="weather-val">{weather.windSpeed}<span className="weather-unit"> km/h</span></div>
+                </div>
+                <div className="weather-stat-box">
+                  <span className="weather-label">Conditions</span>
+                  <div className="weather-val" style={{ fontSize: '1.2rem' }}>{weather.condition}</div>
+                </div>
+              </div>
+              {weather.alerts && weather.alerts.length > 0 && (
+                <div className="weather-alerts-container">
+                  {weather.alerts.map((alert, idx) => (
+                    <div key={idx} className="weather-alert-banner">
+                      <span className="pulse-dot" style={{ backgroundColor: '#ff4b4b' }}></span>
+                      {alert}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Citizen Outage Reports Card */}
-            <div className="reports-card glass-panel">
+            <div className="reports-card glass-panel full-width-card">
               <div className="section-header">
                 <div className="section-title">
                   Incident Feeds & Outages
@@ -750,9 +786,6 @@ function DashboardView({
               )}
             </div>
 
-          </div>
-
-        </main>
       </div>
 
       {/* Grid Issue Reporting Modal */}
@@ -823,3 +856,106 @@ function DashboardView({
     </div>
   );
 }
+
+// ── COMPONENT 5: BACKGROUND VIDEO ──
+function BackgroundVideo({ condition }: { condition: string }) {
+  const [videoIndex, setVideoIndex] = useState(0);
+
+  useEffect(() => {
+    // Reset index when condition changes
+    setVideoIndex(0);
+  }, [condition]);
+
+  const getVideoList = (cond: string) => {
+    switch (cond.toLowerCase()) {
+      case 'clear':
+      case 'partly cloudy':
+        return ['/videos/clear/clear1.mp4', '/videos/clear/clear2.mp4'];
+      case 'thunderstorms':
+        return ['/videos/thunder/thunder.mp4'];
+      case 'dust storm':
+        return ['/videos/dust/dust.mp4'];
+      case 'haze':
+      default:
+        return ['/videos/haze/haze.mp4'];
+    }
+  };
+
+  const videoList = getVideoList(condition);
+  const currentVideo = videoList[videoIndex % videoList.length];
+
+  const handleEnded = () => {
+    setVideoIndex(prev => prev + 1);
+  };
+
+  return (
+    <video
+      key={currentVideo}
+      src={currentVideo}
+      autoPlay
+      muted
+      playsInline
+      loop={videoList.length === 1}
+      onEnded={videoList.length > 1 ? handleEnded : undefined}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        objectFit: 'cover',
+        zIndex: -2,
+        opacity: 1,
+        filter: 'brightness(0.75)',
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
+// ── COMPONENT 6: BOTTOM NAV ──
+function BottomNav() {
+  const [activeTab, setActiveTab] = useState('Dashboard');
+  
+  const navItems = [
+    { id: 'Dashboard', icon: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg> },
+    { id: 'Maps', icon: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="10" r="3"></circle><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"></path></svg> },
+    { id: 'Reports', icon: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> },
+    { id: 'Profile', icon: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> },
+  ];
+
+  return (
+    <>
+      <svg style={{ width: 0, height: 0, position: 'absolute' }} aria-hidden="true">
+        <filter id="glass-distortion">
+          <feTurbulence 
+            type="fractalNoise" 
+            baseFrequency="0.015 0.015" 
+            numOctaves="3" 
+            result="noise" 
+          />
+          <feDisplacementMap 
+            in="SourceGraphic" 
+            in2="noise" 
+            scale="10" 
+            xChannelSelector="R" 
+            yChannelSelector="G" 
+          />
+        </filter>
+      </svg>
+      <div className="bottom-nav">
+        {navItems.map(item => (
+          <button 
+            key={item.id} 
+            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(item.id)}
+          >
+            <div className="nav-icon">{item.icon}</div>
+            <span className="nav-label">{item.id}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+

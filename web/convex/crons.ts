@@ -1,6 +1,6 @@
 import { cronJobs } from "convex/server";
 import { internalAction } from "./_generated/server";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 
 const CITIES = [
   { id: "lucknow", name: "Lucknow", lat: 26.85, lon: 80.95 },
@@ -19,6 +19,7 @@ export const runPredictionForAllCities = internalAction({
   handler: async (ctx) => {
     // Note: You must set ML_SERVICE_URL in the Convex Dashboard > Settings > Environment Variables
     // (e.g., https://btbb-ml-service.onrender.com)
+    // @ts-ignore
     const mlServiceUrl = process.env.ML_SERVICE_URL;
     
     if (!mlServiceUrl) {
@@ -101,6 +102,7 @@ const crons = cronJobs();
 // Schedule the action to run at the top of every hour
 crons.hourly(
   "hourly-risk-predictions",
+  { minuteUTC: 0 },
   internal.crons.runPredictionForAllCities,
 );
 
