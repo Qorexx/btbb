@@ -6,29 +6,29 @@
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   /* Monochromatic Color Palette */
-  --bg-dark: #f0f0f0;
-  --bg-card: rgba(255, 255, 255, 0.45);
-  --bg-card-hover: rgba(255, 255, 255, 0.6);
+  --bg-dark: #070708;
+  --bg-card: rgba(18, 18, 22, 0.45);
+  --bg-card-hover: rgba(26, 26, 32, 0.6);
   
-  --text-main: #1a1a1a;
-  --text-secondary: #334155; /* Dark Slate instead of gray */
-  --text-muted: #475569;     /* Deep Slate instead of light gray */
+  --text-main: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #6b6b75;
   
   /* Grayscale Contrast Risk Levels */
-  --risk-low: #d4d4d8;
-  --risk-moderate: #a1a1aa;
-  --risk-high: #3f3f46;
-  --risk-critical: #000000;
+  --risk-low: #3f3f46;
+  --risk-moderate: #71717a;
+  --risk-high: #e4e4e7;
+  --risk-critical: #ffffff;
 
-  --border-subtle: rgba(0, 0, 0, 0.06);
-  --border-hover: rgba(0, 0, 0, 0.14);
-  --shadow-subtle: 0 40px 80px rgba(0, 0, 0, 0.15);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.14);
+  --shadow-subtle: 0 40px 80px rgba(0, 0, 0, 0.95);
   
   /* Glass parameters */
   --glass-blur: blur(40px);
   --glass-blur-heavy: blur(50px);
 
-  color-scheme: light;
+  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -45,7 +45,6 @@ body {
   background: transparent;
   color: var(--text-main);
   font-family: var(--font-body);
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5); /* subtle white halo to help dark text pop against bright videos */
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 100vh;
