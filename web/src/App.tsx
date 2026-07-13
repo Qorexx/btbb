@@ -309,7 +309,7 @@ interface AppSubProps {
   onLogout?: () => void;
 }
 
-function ConvexConnectedApp({ activeTab, setActiveTab, currentCityId, setCurrentCityId, simulation, setSimulation, historicalMode, setHistoricalMode }: AppSubProps) {
+function ConvexConnectedApp({ activeTab, setActiveTab, currentCityId, setCurrentCityId, simulation, setSimulation, historicalMode, setHistoricalMode , onLogout}: AppSubProps) {
   
   // Real Convex queries
   const latestPrediction = useQuery((api as any).predictions.getLatest, { cityId: currentCityId });
@@ -399,7 +399,7 @@ function ConvexConnectedApp({ activeTab, setActiveTab, currentCityId, setCurrent
   };
 
   if (activeTab === 'Profile') {
-    return <ProfileView currentCityId={currentCityId} simulation={simulation} setSimulation={setSimulation} historicalMode={historicalMode} setHistoricalMode={setHistoricalMode} onInjectFault={handleInjectFault} />;
+    return <ProfileView currentCityId={currentCityId} simulation={simulation} setSimulation={setSimulation} historicalMode={historicalMode} setHistoricalMode={setHistoricalMode} onInjectFault={handleInjectFault} onLogout={onLogout} />;
   }
 
   return (
@@ -414,12 +414,13 @@ function ConvexConnectedApp({ activeTab, setActiveTab, currentCityId, setCurrent
       onAddReport={handleAddReport}
       onCycleStatus={handleCycleStatus}
       simulation={simulation}
+      onLogout={onLogout}
     />
   );
 }
 
 // ── COMPONENT 3: SIMULATED / OFFLINE MODE ──
-function SimulatedApp({ activeTab, setActiveTab, currentCityId, setCurrentCityId, simulation, setSimulation, historicalMode, setHistoricalMode }: AppSubProps) {
+function SimulatedApp({ activeTab, setActiveTab, currentCityId, setCurrentCityId, simulation, setSimulation, historicalMode, setHistoricalMode , onLogout}: AppSubProps) {
   const [localReports, setLocalReports] = useState<CitizenReport[]>(MOCK_REPORTS);
   const [predictionsMap, setPredictionsMap] = useState<Record<string, Prediction>>(MOCK_PREDICTIONS);
   const historyCache = useRef<Record<string, { timestamp: number; risk: number }[]>>({});
@@ -528,7 +529,7 @@ function SimulatedApp({ activeTab, setActiveTab, currentCityId, setCurrentCityId
   };
 
   if (activeTab === 'Profile') {
-    return <ProfileView currentCityId={currentCityId} simulation={simulation} setSimulation={setSimulation} historicalMode={historicalMode} setHistoricalMode={setHistoricalMode} onInjectFault={handleInjectFault} />;
+    return <ProfileView currentCityId={currentCityId} simulation={simulation} setSimulation={setSimulation} historicalMode={historicalMode} setHistoricalMode={setHistoricalMode} onInjectFault={handleInjectFault} onLogout={onLogout} />;
   }
 
   return (
@@ -543,6 +544,7 @@ function SimulatedApp({ activeTab, setActiveTab, currentCityId, setCurrentCityId
       onAddReport={handleAddReport}
       onCycleStatus={handleCycleStatus}
       simulation={simulation}
+      onLogout={onLogout}
     />
   );
 }
@@ -1752,9 +1754,10 @@ interface ProfileViewProps {
   historicalMode: boolean;
   setHistoricalMode: (mode: boolean) => void;
   onInjectFault?: () => void;
+  onLogout?: () => void;
 }
 
-function ProfileView({ currentCityId, simulation, setSimulation, historicalMode, setHistoricalMode, onInjectFault }: ProfileViewProps) {
+function ProfileView({ currentCityId, simulation, setSimulation, historicalMode, setHistoricalMode, onInjectFault, onLogout }: ProfileViewProps) {
   const activeCity = CITIES.find(c => c.id === currentCityId) || CITIES[0];
   
   const demoMode = simulation !== 'none';
@@ -1792,6 +1795,27 @@ function ProfileView({ currentCityId, simulation, setSimulation, historicalMode,
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: '0 0 4px 0', fontFamily: 'var(--font-heading)' }}>John Doe</h1>
             <div style={{ color: '#fa2d48', fontWeight: 700, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Senior Grid Dispatcher</div>
             <div style={{ color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>ID: OP-7824-A</div>
+            {onLogout && (
+              <button 
+                onClick={onLogout}
+                style={{
+                  marginTop: '24px',
+                  background: 'rgba(250,45,72,0.1)',
+                  color: '#fa2d48',
+                  border: '1px solid rgba(250,45,72,0.3)',
+                  padding: '10px 20px',
+                  borderRadius: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  width: '100%',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(250,45,72,0.2)'}
+                onMouseOut={e => e.currentTarget.style.background = 'rgba(250,45,72,0.1)'}
+              >
+                LOGOUT
+              </button>
+            )}
           </div>
 
           <div style={{ background: 'rgba(255,255,255,0.3)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.4)', marginBottom: '24px' }}>
