@@ -2,8 +2,6 @@
 
 AI-powered power outage prediction for the Uttar Pradesh and National Capital Region (UP/NCR) in India. DrishtiX combines an XGBoost classifier trained on real US outage data with a live application stack that fetches weather, scores grid failure risk, and surfaces explainable predictions through a web dashboard.
 
-Repository: [github.com/amisha-srivastavaa/DrishtiX](https://github.com/amisha-srivastavaa/DrishtiX)
-
 ---
 
 ## Introduction
